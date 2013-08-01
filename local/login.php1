@@ -1,0 +1,153 @@
+<?php
+
+session_start();
+	require("dbconn.php");
+	require("htmlbody/index.php");
+	//require("htmlbody/securityPatch.php");
+	
+	$main = "http://localhost/esd15.11/main/";
+	
+	$key = '';
+	$queryTime = "SELECT unix_timestamp(e_startDate) as Start, unix_timestamp(e_stopDate) as Stop FROM events";
+	$timestamps = mysql_query($queryTime);
+	$timestamps = mysql_fetch_array($timestamps);
+	$currTime = time();
+	
+	if ($currTime >= $timestamps['Start'] && $currTime <= $timestamps['Stop'])
+	{
+		
+		$email = mysql_real_escape_string($_POST['email']);
+		$password = md5($_POST['password']);
+		session_cache_expire(10); //Session expires in 10minutes
+		
+		$posts = mysql_query("SELECT * FROM members WHERE mem_email = '$email' AND mem_password = '$password' AND mem_voted = 0" );
+		$count = mysql_num_rows($posts);
+		
+		$key = "SELECT e_key FROM `keys`";
+		$key = mysql_query($key) or die("error: ".mysql_error());
+		$key = mysql_fetch_array($key);
+		
+		$plainKey = $key['e_key'];
+		$key = md5($plainKey);
+
+		
+		mysql_close($conn);
+		login($count, $main, $key, $plainKey);
+		
+		
+
+	}
+	else
+	{
+		htmlupper();
+		
+		if ($currTime < $timestamps['Start'])
+		{
+			echo '<h2> Votes not open yet</h2>
+			Sorry, you cannot vote at this time.';
+		}
+		else
+		{
+			'<h2> Votes Closed</h2>
+			Sorry, you cannot vote at this time.';
+		}
+				
+		htmllower();	
+	}
+		
+	function login($access, $main, $key, $plainKey)
+	{
+		global $email;
+		
+		if ($access)
+		{
+			 
+			$_SESSION['logger'] = $email; // store who's log
+			$filename = 'vote.php';
+			
+			if (!file_exists($filename)) // if file already generated no need to call server, ene sorte cache
+			{
+				$form = requestForm($main, $key);
+				
+				$iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_ECB);
+				$iv = mcrypt_create_iv($iv_size, MCRYPT_RAND);
+				//$plain = htmlspecialchars_decode(rtrim(mcrypt_decrypt(MCRYPT_RIJNDAEL_256, $plainKey, base64_decode($form), MCRYPT_MODE_ECB, $iv),"\0"));
+				$plain = "YO";
+				$form = "<?php
+					session_start();
+					header('Cache-Control: no-cache');
+					if (isset(\$_SESSION))
+					{
+						require('htmlbody/index.php'); 
+						htmlupper(); 
+						?>  \n".$plain."\n
+						
+						<?php echo \"<script>window.history.forward(1);</script>\"; htmllower();
+					}
+					else
+					{
+						header('location:index.php');
+					}?>";
+				//writeForm($form);
+
+			}
+			
+			header("Location:vote.php");
+		}
+		else // wrong credentials
+		{
+			htmlupper();
+			echo '<h2> Wrong Credentials, check if you:</h2> <h4><ol>
+			<li>Mistyped either your username or password</li>
+			<li>Already voted</li>
+			<li>Are not yet registed</li>
+			</ol></h4><br/>
+			<a href="index.php">Try Again.</a>';
+			htmllower();
+		}
+	}
+
+
+
+	function requestForm($main, $key)
+	{
+	
+		$url=$main."request.php?key=".$key;   // echo "requesting form at ".$url."....";
+		$curl = curl_init();
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($curl, CURLOPT_URL, $url);
+		curl_setopt($curl, CURLOPT_GET, true);
+		curl_setopt($curl, CURLOPT_HEADER, false);
+		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+		$form_enc = curl_exec($curl) or die(curl_error($curl));
+		curl_close($curl);
+		return $form_enc;
+		
+	}
+
+	function writeForm($data)
+	{
+		$myFile = "vote.php";
+		$fh = fopen($myFile, 'w+') or die(0);
+		fwrite($fh, $data);
+		fclose($fh);
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+?>

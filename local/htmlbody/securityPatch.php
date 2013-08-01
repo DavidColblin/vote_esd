@@ -1,0 +1,1 @@
+<?php	//session_start();		if (!isset($_SESSION['logger'])){			header("Location:index.php");		}?>

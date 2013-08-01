@@ -1,0 +1,5 @@
+receipt.php : line 20. function is found down
+securitypatch.php: removed "session_start();"
+
+main: Create folder mob
+created votereceipt.php
